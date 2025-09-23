@@ -36,6 +36,9 @@ classdef FileSelector < wt.abstract.BaseWidget & ...
 
     properties (AbortSet)
 
+        % Button text that appears on the button
+        ButtonLabel (1,1) string = ""
+
         % Selection type: (get)file, folder, putfile
         SelectionType (1,1) wt.enum.FileFolderState = wt.enum.FileFolderState.file
 
@@ -138,13 +141,27 @@ classdef FileSelector < wt.abstract.BaseWidget & ...
             obj.FieldColorableComponents = [obj.EditControl, obj.DropdownControl];
             obj.EnableableComponents = [obj.EditControl, obj.DropdownControl, obj.ButtonControl];
             obj.ButtonColorableComponents = obj.ButtonControl;
-            obj.TooltipableComponents = [obj.EditControl, obj.DropdownControl, obj.ButtonControl];
+            obj.TooltipableComponents = [obj.ButtonControl];
             obj.BackgroundColorableComponents = obj.Grid;
 
         end %function
 
 
         function update(obj)
+
+            % The Tooltip starts with the property value
+            tooltip = obj.Tooltip;
+
+            % Prepare an extended tooltip in case of a long path
+            if strlength(obj.Value) < 30
+                % Do nothing - the path is short
+            elseif strlength(tooltip)
+                % There is also a Tooltip value, so include both
+                tooltip = tooltip + newline + newline + obj.Value;
+            else
+                % Only a long path
+                tooltip = obj.Value;
+            end
 
             % Is history being shown?
             if obj.ShowHistory
@@ -162,17 +179,56 @@ classdef FileSelector < wt.abstract.BaseWidget & ...
                 obj.DropdownControl.Items = histItems;
                 obj.DropdownControl.Value = obj.Value;
 
+                % Update the tooltip
+                obj.DropdownControl.Tooltip = tooltip;
+
             else
                 % NO - Using edit control
 
                 % Update the edit control text
                 obj.EditControl.Value = obj.Value;
 
+                % Update the tooltip
+                obj.EditControl.Tooltip = tooltip;
+
             end %if obj.ShowHistory
 
             % Show the warning icon?
             showWarn = strlength(obj.Value) && ~obj.ValueIsValidPath;
             obj.WarnImage.Visible = showWarn;
+
+            % Set warning icon tooltip
+            if showWarn
+                if obj.SelectionType == "file"
+                    obj.WarnImage.Tooltip = 'File does not exist.';
+                elseif obj.SelectionType == "putfile"
+                    obj.WarnImage.Tooltip = 'Folder for file storage does not exist.';
+                else
+                    obj.WarnImage.Tooltip = 'Folder does not exist.';
+                end
+            end
+
+            % Update button appearance
+            obj.ButtonControl.Text = obj.ButtonLabel;
+            if strlength(obj.ButtonLabel)
+                obj.Grid.ColumnWidth{4} = 125;
+            else
+                obj.Grid.ColumnWidth{4} = 25;
+            end
+
+        end %function
+
+        
+        function updateTooltipableComponents(obj)
+            % Override this to ensure the update is called when Tooltip
+            % changes, so the combination of Tooltip and long paths are
+            % shown correctly
+
+            % Call superclass method
+            obj.updateTooltipableComponents@wt.mixin.Tooltipable();
+
+            % Trigger update
+            obj.requestUpdate()
 
         end %function
 

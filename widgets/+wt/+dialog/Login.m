@@ -23,6 +23,9 @@ classdef Login < wt.abstract.BaseInternalDialog
             % Defaults
             obj.Size = [300,140];
 
+            % This is normally a modal dialog
+            obj.Modal = true;
+
             % Configure which actions close the dialog
             obj.DeleteActions = ["close","login","cancel"];
 
@@ -61,7 +64,9 @@ classdef Login < wt.abstract.BaseInternalDialog
             obj.PasswordField.ValueChangingFcn = @(~,~)onValueEdited(obj);
 
             % Update component lists
-            % obj.BackgroundColorableComponents = [obj.Grid]
+            % obj.BackgroundColorableComponents = []
+            obj.FieldColorableComponents = [obj.LoginField];
+            obj.FontStyledComponents = [obj.FontStyledComponents, obj.LoginField];
 
         end %function
 
@@ -95,8 +100,14 @@ classdef Login < wt.abstract.BaseInternalDialog
         function assignOutput(obj)
 
             % Assign output
-            output.Login = string( obj.LoginField.Value );
-            output.Password = string( obj.PasswordField.Value );
+            if obj.LastAction == "login"
+                output.Login = string( obj.LoginField.Value );
+                output.Password = string( obj.PasswordField.Value );
+            else
+                output.Login = "";
+                output.Password = "";
+            end
+
             obj.Output = output;
 
         end %function
