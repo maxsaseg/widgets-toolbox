@@ -262,7 +262,7 @@ classdef BaseInternalDialog  < wt.abstract.BaseWidget & ...
 
             % Update dialog position
             if ~isequal(obj.Position, posNew)
-                fprintf(" Change position: posOld = %f  posNew = %f\n", obj.Position, posNew);
+                % fprintf(" Change position: posOld = %f  posNew = %f\n", obj.Position, posNew);
                 obj.Position = posNew;
             end
 
@@ -316,19 +316,24 @@ classdef BaseInternalDialog  < wt.abstract.BaseWidget & ...
             obj.IsWaitingForOutput = true;
             waitfor(obj,'IsWaitingForOutput',false)
 
-            % Produce output
+            % Complete the wait action
+            % Is the dialog still present?
             if isvalid(obj)
+
+                % Assign the output
                 output = obj.Output;
                 lastAction = obj.LastAction;
+
+                % Check for deletion criteria and delete dialog
+                obj.checkDeletionCriteria()
+
             else
+                
                 % Dialog or figure was deleted
                 output = [];
                 lastAction = "close";
+
             end
-
-
-            % Check for deletion criteria
-            obj.checkDeletionCriteria()
 
         end %function
 
@@ -395,7 +400,7 @@ classdef BaseInternalDialog  < wt.abstract.BaseWidget & ...
 
             % Outer dialog panel
             obj.OuterPanel = uipanel(obj.OuterGrid);
-            obj.OuterPanel.Title = "Dialog Title";
+            obj.OuterPanel.Title = " ";
             obj.OuterPanel.FontSize = 16;
             obj.OuterPanel.FontWeight = "bold";
             %obj.OuterPanel.BorderWidth = 1;
@@ -403,7 +408,7 @@ classdef BaseInternalDialog  < wt.abstract.BaseWidget & ...
             obj.OuterPanel.ButtonDownFcn = @(~,evt)onTitleButtonDown(obj,evt);
 
             % Close Button
-            obj.CloseButton = uibutton(obj.OuterPanel);
+            obj.CloseButton = uibutton(obj);
             obj.CloseButton.Text = "";
             obj.CloseButton.Tag = "close";
             obj.CloseButton.IconAlignment = "center";
