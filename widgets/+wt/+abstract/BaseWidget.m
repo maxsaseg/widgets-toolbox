@@ -5,7 +5,7 @@ classdef BaseWidget < ...
         wt.mixin.ErrorHandling
     % Base class for a graphical widget
 
-    % Copyright 2020-2025 The MathWorks Inc.
+    % Copyright 2020-2026 The MathWorks Inc.
 
 
     %% Events
@@ -54,10 +54,18 @@ classdef BaseWidget < ...
     %% Debugging Methods
     methods
 
-        function forceUpdate(obj)
+        function forceUpdate(obj, showMessage)
             % Forces update to run (For debugging only!)
 
-            disp("DEBUG: Forcing update for " + class(obj));
+            arguments
+                obj
+                showMessage (1,1) logical = true
+            end
+
+            if showMessage
+                disp("DEBUG: Forcing update for " + class(obj));
+            end
+            
             obj.update();
 
         end %function
@@ -77,7 +85,7 @@ classdef BaseWidget < ...
             obj = obj@matlab.ui.componentcontainer.ComponentContainer(args{:});
 
             % Listen to theme changes (R2025a and later only)
-            if ~isMATLABReleaseOlderThan("R2025a")
+            if wt.utility.supportsUIThemes()
                 obj.InternalThemeChangedListener = listener(obj,"ThemeChanged",...
                     @(~,evt)onWidgetThemeChanged_I(obj));
                 % obj.WidgetTheme = obj.getTheme();
@@ -157,16 +165,13 @@ classdef BaseWidget < ...
             % Get color from theme and semantic variable
 
             msg = "MATLAB R2025a or later is needed to call wt.abstract.BaseWidget.getThemeColor().";
-            assert(~isMATLABReleaseOlderThan("R2025a"), msg)
+            assert(wt.utility.supportsUIThemes(), msg)
 
             % Get the theme
             theme = obj.getTheme();
 
             % Get theme from semantic variable
-            % This is undocumented and may change. Better to call the
-            % getThemeColor method rather than reusing this directly.
-            color = matlab.graphics.internal.themes.getAttributeValue(...
-                theme, semanticColorId);
+            color = wt.utility.getThemeColor(theme, semanticColorId);
 
         end %function
 

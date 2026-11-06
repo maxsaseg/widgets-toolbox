@@ -1,13 +1,31 @@
 classdef ListSelectionDialog < wt.test.BaseDialogTest
     % Implements a unit test for a widget or component
     
-    %   Copyright 2025 The MathWorks Inc.
+    %   Copyright 2025-2026 The MathWorks Inc.
     
     %% Properties
     properties
         ItemNames = "TestItem" + string(1:5);
         ItemData = "TestData" + string(1:5);
     end
+
+
+    properties (Access = private)
+        ResizePositions = zeros(0,4)
+        DialogButtonEvents (1,:) cell = {}
+    end
+
+
+    %% Test Method Setup
+    methods (TestMethodSetup)
+
+        function resetEventTracking(testCase)
+
+            testCase.DialogButtonEvents = {};
+
+        end %function
+
+    end %methods
      
     
     %% Unit Test
@@ -39,9 +57,142 @@ classdef ListSelectionDialog < wt.test.BaseDialogTest
             testCase.verifyEqual(dlg.DeleteActions, ["close","ok","cancel"]);
             testCase.verifyEmpty(dlg.Output);
             testCase.verifyFalse(dlg.IsWaitingForOutput);
+            testCase.verifyFalse(dlg.Resizable);
 
             % Size was honored
             testCase.verifyEqual(dlg.Position(3:4), [300 300]);
+
+        end %function
+
+
+        function testResizableProperty(testCase)
+
+            % Create the dialog
+            dlg = wt.dialog.ListSelection(testCase.Figure);
+            drawnow
+
+            % Enable resize behavior
+            dlg.Resizable = true;
+            drawnow
+
+            testCase.verifyTrue(dlg.Resizable);
+            testCase.verifyEqual(dlg.Position(3:4), [300 300]);
+
+            % Disable resize behavior
+            dlg.Resizable = false;
+            drawnow
+
+            testCase.verifyFalse(dlg.Resizable);
+            testCase.verifyEqual(dlg.Position(3:4), [300 300]);
+
+        end %function
+
+
+        function testResizableHoverPointer(testCase)
+
+            import matlab.unittest.constraints.Eventually
+            import matlab.unittest.constraints.IsEqualTo
+
+            % Create the dialog
+            dlg = wt.dialog.ListSelection(testCase.Figure);
+            dlg.Resizable = true;
+            drawnow
+
+            % Hover over the right edge
+            pos = dlg.Position;
+            edgePoint = [pos(1)+pos(3)-2, pos(2)+round(pos(4)/2)];
+            testCase.hover(testCase.Figure, edgePoint);
+
+            % Verify the figure pointer indicates horizontal resizing
+            testCase.verifyThat(@()string(testCase.Figure.Pointer), ...
+                Eventually(IsEqualTo("right"), "WithTimeoutOf", 5));
+
+            % Hover inside the dialog away from the edge
+            centerPoint = pos(1:2) + round(pos(3:4)/2);
+            testCase.hover(testCase.Figure, centerPoint);
+
+            % Verify the figure pointer is restored
+            testCase.verifyThat(@()string(testCase.Figure.Pointer), ...
+                Eventually(IsEqualTo("arrow"), "WithTimeoutOf", 5));
+
+        end %function
+
+
+        function testResizableLeftEdgeDragUpdatesSizeDuringGesture(testCase)
+
+            % Create the dialog
+            dlg = wt.dialog.ListSelection(testCase.Figure);
+            dlg.Resizable = true;
+            dlg.Position = [250 180 300 260];
+            dlg.Size = [300 260];
+            drawnow
+
+            % Track all size changes while the gesture is running
+            testCase.ResizePositions = zeros(0,4);
+            dlg.SizeChangedFcn = ...
+                @(src,~)recordResizePosition(testCase, src.Position);
+
+            % Drag the left edge leftward
+            pos = dlg.Position;
+            startPoint = [pos(1)+2, pos(2)+round(pos(4)/2)];
+            stopPoint = startPoint + [-60 0];
+            testCase.drag(testCase.Figure, startPoint, stopPoint);
+            drawnow
+
+            % Verify there was at least one live intermediate resize
+            widths = testCase.ResizePositions(:,3);
+            testCase.verifyGreaterThan(size(testCase.ResizePositions,1), 1)
+            testCase.verifyTrue(any(widths > 300 & widths < 360))
+
+            % Verify the right edge stayed anchored
+            testCase.verifyEqual(dlg.Position, [190 180 360 260])
+            testCase.verifyEqual(dlg.Size, [360 260])
+
+        end %function
+
+
+        function testResizableBottomEdgeDragAnchorsTopEdge(testCase)
+
+            % Create the dialog
+            dlg = wt.dialog.ListSelection(testCase.Figure);
+            dlg.Resizable = true;
+            dlg.Position = [250 180 300 260];
+            dlg.Size = [300 260];
+            drawnow
+
+            % Drag the bottom edge downward
+            pos = dlg.Position;
+            startPoint = [pos(1)+round(pos(3)/2), pos(2)+2];
+            stopPoint = startPoint + [0 -40];
+            testCase.drag(testCase.Figure, startPoint, stopPoint);
+            drawnow
+
+            % Verify it resized vertically with the top edge anchored
+            testCase.verifyEqual(dlg.Position, [250 140 300 300])
+            testCase.verifyEqual(dlg.Size, [300 300])
+
+        end %function
+
+
+        function testResizableTopEdgeDragDoesNotMoveDialog(testCase)
+
+            % Create the dialog
+            dlg = wt.dialog.ListSelection(testCase.Figure);
+            dlg.Resizable = true;
+            dlg.Position = [250 180 300 260];
+            dlg.Size = [300 260];
+            drawnow
+
+            % Drag the top edge upward
+            pos = dlg.Position;
+            startPoint = [pos(1)+round(pos(3)/2), pos(2)+pos(4)-2];
+            stopPoint = startPoint + [0 60];
+            testCase.drag(testCase.Figure, startPoint, stopPoint);
+            drawnow
+
+            % Verify it resized vertically instead of moving the dialog
+            testCase.verifyEqual(dlg.Position, [250 180 300 320])
+            testCase.verifyEqual(dlg.Size, [300 320])
 
         end %function
 
@@ -153,6 +304,38 @@ classdef ListSelectionDialog < wt.test.BaseDialogTest
             testCase.verifyNotEnabled(dlg.DialogButtons.Button(1))
             testCase.verifyEnabled(dlg.DialogButtons.Button(2))
             testCase.verifyEqual(logical(dlg.DialogButtonEnable), [false true]);
+
+        end %function
+
+
+        function testOkOutputWithNumericItemsData(testCase)
+
+            % Create the dialog
+            dlg = wt.dialog.ListSelection(testCase.Figure);
+            dlg.Items = testCase.ItemNames;
+            dlg.ItemsData = 1:numel(testCase.ItemNames);
+            dlg.Multiselect = true;
+            dlg.Value = [2 4];
+            dlg.DialogButtonPushedFcn = ...
+                @(~,evt)recordDialogButtonEvent(testCase, evt);
+
+            % Enable drawing to complete
+            drawnow
+
+            % Press button
+            testCase.assumeTrue(dlg.DialogButtons.Button(1).Enable)
+            testCase.press(dlg.DialogButtons.Button(1))
+            drawnow
+
+            % Verify output captured before deletion
+            testCase.verifyNumElements(testCase.DialogButtonEvents, 1)
+            evt = testCase.DialogButtonEvents{1};
+            testCase.verifyEqual(evt.Action, "ok")
+            testCase.verifyEqual(evt.Output.Value, [2 4])
+            testCase.verifyEqual(evt.Output.ValueIndex, [2 4])
+
+            % Verify dlg was deleted
+            testCase.verifyFalse(isvalid(dlg));
 
         end %function
 
@@ -328,5 +511,23 @@ classdef ListSelectionDialog < wt.test.BaseDialogTest
         end %function
         
     end %methods (Test)
+
+
+    methods (Access = private)
+
+        function recordResizePosition(testCase, position)
+
+            testCase.ResizePositions(end+1,:) = position;
+
+        end %function
+
+
+        function recordDialogButtonEvent(testCase, evt)
+
+            testCase.DialogButtonEvents{end+1} = evt;
+
+        end %function
+
+    end %methods
     
 end %classdef
